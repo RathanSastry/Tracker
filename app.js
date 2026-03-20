@@ -40,11 +40,13 @@ const Auth = {
       this.user = session.user;
       return session.user;
     }
-    this._showModal();
+    // No auth required on load — guest access allowed for first activity
     return null;
   },
 
-  _showModal() {
+  _showModal(message) {
+    const subtitle = document.getElementById('auth-subtitle');
+    if (message && subtitle) subtitle.textContent = message;
     document.getElementById('auth-overlay').classList.remove('hidden');
     const submit = document.getElementById('auth-submit');
     const toggle = document.getElementById('auth-toggle');
@@ -84,7 +86,14 @@ const Auth = {
         this.user = data.user;
         document.getElementById('auth-overlay').classList.add('hidden');
         await SupaStorage.loadAll();
-        App.initApp();
+        if (App._initialized) {
+          // App already running as guest — just refresh views with cloud data
+          Home.refresh();
+          Profile.refresh();
+          StripeEngine.updateUI();
+        } else {
+          App.initApp();
+        }
       }
     } catch (e) {
       Toast.error(e.message || 'Authentication failed');
@@ -721,6 +730,13 @@ const Tracker = {
 
   start() {
     if (State.status === 'running') return;
+
+    // Guest gate: allow first activity freely, enforce sign-up from second onward
+    if (!Auth.user && Storage.getHistory().length >= 1) {
+      Auth._showModal('Create a free account to keep recording your activities!');
+      return;
+    }
+
     if (State.status === 'idle') {
       State.startTime = Date.now();
       State.pausedMs  = 0;
@@ -2170,13 +2186,19 @@ const App = {
     // Bind auth modal first (Toast needs DOM ready)
     Modal.init();
     const user = await Auth.init();
-    if (!user) return; // Auth modal shown — initApp() called after login
 
-    await SupaStorage.loadAll();
+    if (user) {
+      await SupaStorage.loadAll();
+    }
+    // Always launch the app — guests can use it for their first activity
     this.initApp();
   },
 
+  _initialized: false,
+
   initApp() {
+    if (this._initialized) return; // Prevent double-binding if called again
+    this._initialized = true;
     Nav.init();
     Onboarding.init();
     Perf.init();
