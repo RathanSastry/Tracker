@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#08080F">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>DRS</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ══════════════════════════════════════
+       AUTH OVERLAY (Supabase login/signup)
+  ══════════════════════════════════════ -->
+  <div id="auth-overlay" class="onboarding-overlay hidden">
+    <div class="onboarding-card">
+      <div class="onboarding-logo">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <circle cx="24" cy="24" r="24" fill="var(--brand)"/>
+          <path d="M14 34 L20 18 L26 28 L30 22 L34 34" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
+      <h1 class="onboarding-title">DRS</h1>
+      <p class="onboarding-sub" id="auth-subtitle">Sign in to your account</p>
+      <div class="ob-fields" style="margin-top:24px;">
+        <label class="ob-label">Email
+          <input id="auth-email" class="ob-input" type="email" placeholder="you@example.com" autocomplete="email">
+        </label>
+        <label class="ob-label">Password
+          <input id="auth-password" class="ob-input" type="password" placeholder="••••••••" autocomplete="current-password">
+        </label>
+      </div>
+      <button id="auth-submit" class="btn-primary ob-btn" style="margin-top:20px;">Sign In</button>
+      <button id="auth-toggle" class="text-btn" style="width:100%;text-align:center;margin-top:12px;">
+        No account? <span id="auth-toggle-label">Create one</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       ONBOARDING OVERLAY
+  ══════════════════════════════════════ -->
+  <div id="onboarding" class="onboarding-overlay hidden">
+    <div class="onboarding-card">
+      <div class="onboarding-logo">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <circle cx="24" cy="24" r="24" fill="var(--brand)"/>
+          <path d="M14 34 L20 18 L26 28 L30 22 L34 34" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
+      <h1 class="onboarding-title">DRS</h1>
+      <p class="onboarding-sub">Your premium fitness companion</p>
+
+      <div class="onboarding-step" id="ob-step-1">
+        <h2>What's your name?</h2>
+        <input id="ob-name" class="ob-input" type="text" placeholder="Enter your name" maxlength="20">
+        <div class="avatar-grid" id="ob-avatar-grid">
+          <button class="av-btn active" data-av="🏃">🏃</button>
+          <button class="av-btn" data-av="🚴">🚴</button>
+          <button class="av-btn" data-av="🧗">🧗</button>
+          <button class="av-btn" data-av="🏊">🏊</button>
+          <button class="av-btn" data-av="💪">💪</button>
+          <button class="av-btn" data-av="⚡">⚡</button>
+          <button class="av-btn" data-av="🦁">🦁</button>
+          <button class="av-btn" data-av="🔥">🔥</button>
+        </div>
+      </div>
+
+      <div class="onboarding-step hidden" id="ob-step-2">
+        <h2>Body stats for accuracy</h2>
+        <div class="ob-fields">
+          <label class="ob-label">Weight (kg)
+            <input id="ob-weight" class="ob-input" type="number" placeholder="70" min="30" max="200">
+          </label>
+          <label class="ob-label">Age
+            <input id="ob-age" class="ob-input" type="number" placeholder="25" min="10" max="100">
+          </label>
+          <label class="ob-label">Gender
+            <select id="ob-gender" class="ob-input ob-select">
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <button id="ob-next" class="btn-primary ob-btn">Continue</button>
+      <div class="ob-dots">
+        <span class="dot active" id="dot-1"></span>
+        <span class="dot" id="dot-2"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       TOAST NOTIFICATIONS
+  ══════════════════════════════════════ -->
+  <div id="toast-stack" class="toast-stack"></div>
+
+  <!-- ══════════════════════════════════════
+       BADGE TOAST (Achievement unlocked)
+  ══════════════════════════════════════ -->
+  <div id="badge-toast" class="badge-toast hidden">
+    <div class="badge-toast-inner">
+      <span class="badge-toast-icon" id="badge-toast-icon">🏅</span>
+      <div>
+        <div class="badge-toast-title">Achievement Unlocked!</div>
+        <div class="badge-toast-name" id="badge-toast-name">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       MAIN VIEWS
+  ══════════════════════════════════════ -->
+  <main id="views">
+
+    <!-- ─── HOME VIEW ──────────────────── -->
+    <section id="v-home" class="view active">
+      <header class="home-header">
+        <div class="home-greeting">
+          <span id="home-avatar" class="home-avatar">🏃</span>
+          <div>
+            <div class="greeting-text" id="home-greeting">Good morning</div>
+            <div class="greeting-name" id="home-name">Runner</div>
+          </div>
+        </div>
+        <div class="home-header-actions">
+          <button class="icon-btn" id="btn-home-settings" title="Settings">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="home-scroll">
+        <!-- Streak banner -->
+        <div class="streak-card" id="streak-card">
+          <span class="streak-fire">🔥</span>
+          <div class="streak-info">
+            <span class="streak-count" id="streak-count">0</span>
+            <span class="streak-label">Day Streak</span>
+          </div>
+          <div class="streak-sub" id="streak-sub">Start your streak today!</div>
+        </div>
+
+        <!-- Week stats -->
+        <div class="section-header">
+          <span class="section-title">This Week</span>
+          <button class="text-btn" id="btn-performance">View All</button>
+        </div>
+        <div class="week-stats-row">
+          <div class="week-stat-card">
+            <span class="wsc-value" id="wk-dist">0.0</span>
+            <span class="wsc-unit">km</span>
+            <span class="wsc-label">Distance</span>
+          </div>
+          <div class="week-stat-card">
+            <span class="wsc-value" id="wk-runs">0</span>
+            <span class="wsc-label">Runs</span>
+          </div>
+          <div class="week-stat-card">
+            <span class="wsc-value" id="wk-time">0h</span>
+            <span class="wsc-label">Time</span>
+          </div>
+          <div class="week-stat-card">
+            <span class="wsc-value" id="wk-cal">0</span>
+            <span class="wsc-label">kcal</span>
+          </div>
+        </div>
+
+        <!-- Weekly bar chart -->
+        <div class="week-chart-card">
+          <div class="section-header" style="margin-bottom: 12px;">
+            <span class="section-title">Daily Distance</span>
+          </div>
+          <div class="week-bars" id="week-bars">
+            <div class="bar-group"><div class="bar" style="height:0%"></div><span>M</span></div>
+            <div class="bar-group"><div class="bar" style="height:0%"></div><span>T</span></div>
+            <div class="bar-group"><div class="bar" style="height:0%"></div><span>W</span></div>
+            <div class="bar-group"><div class="bar" style="height:0%"></div><span>T</span></div>
+            <div class="bar-group"><div class="bar" style="height:0%"></div><span>F</span></div>
+            <div class="bar-group"><div class="bar" style="height:0%"></div><span>S</span></div>
+            <div class="bar-group today"><div class="bar" style="height:0%"></div><span>S</span></div>
+          </div>
+        </div>
+
+        <!-- AI Insight card -->
+        <div class="section-header">
+          <span class="section-title">AI Insights</span>
+          <span class="pro-badge">PRO</span>
+        </div>
+        <div class="insight-card" id="insight-card">
+          <div class="insight-icon">🤖</div>
+          <div class="insight-content">
+            <div class="insight-title" id="insight-title">Analyzing your training…</div>
+            <div class="insight-body" id="insight-body">Complete a few runs to unlock personalized AI insights.</div>
+          </div>
+        </div>
+
+        <!-- Recent activity -->
+        <div class="section-header">
+          <span class="section-title">Last Activity</span>
+          <button class="text-btn" id="btn-history">History</button>
+        </div>
+        <div id="last-activity-card" class="last-activity-card">
+          <div class="empty-state">
+            <div class="empty-icon">👟</div>
+            <div>No activities yet. Start your first run!</div>
+          </div>
+        </div>
+
+        <!-- Quick start -->
+        <div class="quick-start-row">
+          <button class="quick-start-btn" id="btn-quick-start">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            Start Run
+          </button>
+          <button class="quick-start-btn secondary" id="btn-set-goal">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+            Set Goal
+          </button>
+        </div>
+
+        <div style="height: 24px;"></div>
+      </div>
+    </section>
+
+    <!-- ─── TRACK VIEW ──────────────────── -->
+    <section id="v-track" class="view hidden">
+      <!-- Full-screen map -->
+      <div id="map"></div>
+
+      <!-- Top overlay -->
+      <div class="track-top-bar">
+        <div id="gps-pill" class="gps-pill">
+          <span class="gps-dot" id="gps-dot"></span>
+          <span id="gps-label">Locating…</span>
+        </div>
+        <div id="goal-pill" class="goal-pill hidden">
+          <span id="goal-pill-text">Goal: —</span>
+        </div>
+      </div>
+
+      <!-- Mode active badge (shown during run) -->
+      <div class="mode-run-badge hidden" id="mode-run-badge">
+        <span id="mode-run-icon">🏃</span>
+        <span id="mode-run-name">Running</span>
+      </div>
+
+      <!-- Mode selector (pre-run only) -->
+      <div class="mode-selector" id="mode-selector">
+        <div class="mode-scroll">
+
+          <button class="mode-card active" data-mode="running" data-color="#FF6500">
+            <span class="mc-icon">🏃</span>
+            <span class="mc-name">Run</span>
+            <span class="mc-sub">Road</span>
+          </button>
+
+          <button class="mode-card" data-mode="jogging" data-color="#FF8534">
+            <span class="mc-icon">🏃</span>
+            <span class="mc-name">Jog</span>
+            <span class="mc-sub">Easy</span>
+          </button>
+
+          <button class="mode-card" data-mode="walking" data-color="#00D97E">
+            <span class="mc-icon">🚶</span>
+            <span class="mc-name">Walk</span>
+            <span class="mc-sub">Brisk</span>
+          </button>
+
+          <button class="mode-card" data-mode="hiking" data-color="#FFB340">
+            <span class="mc-icon">🥾</span>
+            <span class="mc-name">Hike</span>
+            <span class="mc-sub">Trail</span>
+          </button>
+
+          <button class="mode-card" data-mode="cycling" data-color="#4FC3F7">
+            <span class="mc-icon">🚴</span>
+            <span class="mc-name">Cycle</span>
+            <span class="mc-sub">Bike</span>
+          </button>
+
+
+        </div>
+      </div>
+
+      <!-- Bottom sheet -->
+      <div class="track-sheet" id="track-sheet">
+
+        <!-- Advanced stats (collapsible) -->
+        <div class="sheet-advanced" id="sheet-advanced">
+          <div class="adv-toggle-row" id="adv-toggle-row">
+            <div class="adv-handle-pill"></div>
+            <span class="adv-toggle-label" id="adv-label">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+              Advanced Stats
+            </span>
+          </div>
+
+          <div class="adv-content" id="adv-content">
+            <!-- HR Section -->
+            <div class="adv-hr-section">
+              <canvas id="ecg-canvas" width="200" height="56"></canvas>
+              <div class="adv-hr-info">
+                <span class="adv-hr-val" id="adv-hr">--</span>
+                <span class="adv-hr-unit">BPM</span>
+                <span class="adv-hr-zone" id="adv-zone">—</span>
+              </div>
+            </div>
+            <div class="hr-zone-bar">
+              <div class="hz rest" data-z="rest">Rest</div>
+              <div class="hz fat" data-z="fat">Fat</div>
+              <div class="hz cardio" data-z="cardio">Cardio</div>
+              <div class="hz vigorous" data-z="vigorous">Vigor</div>
+              <div class="hz max" data-z="max">Max</div>
+            </div>
+
+            <!-- Body metrics grid -->
+            <div class="adv-metrics-grid">
+              <div class="adv-metric"><span class="adv-m-icon">👣</span><span class="adv-m-val" id="adv-steps">0</span><span class="adv-m-lbl">Steps</span></div>
+              <div class="adv-metric"><span class="adv-m-icon">⚡</span><span class="adv-m-val" id="adv-power">0W</span><span class="adv-m-lbl">Power</span></div>
+              <div class="adv-metric"><span class="adv-m-icon">🦵</span><span class="adv-m-val" id="adv-stride">0m</span><span class="adv-m-lbl">Stride</span></div>
+              <div class="adv-metric"><span class="adv-m-icon">🌡️</span><span class="adv-m-val" id="adv-temp">--°</span><span class="adv-m-lbl">Temp</span></div>
+              <div class="adv-metric"><span class="adv-m-icon">💧</span><span class="adv-m-val" id="adv-sweat">0ml</span><span class="adv-m-lbl">Sweat</span></div>
+              <div class="adv-metric"><span class="adv-m-icon">🫁</span><span class="adv-m-val" id="adv-o2">98%</span><span class="adv-m-lbl">SpO₂</span></div>
+            </div>
+
+            <!-- Interval HUD -->
+            <div class="interval-hud hidden" id="interval-hud">
+              <div class="ihud-phase" id="ihud-phase">WORK</div>
+              <div class="ihud-timer" id="ihud-timer">0:30</div>
+              <div class="ihud-rep" id="ihud-rep">Rep 1 / 8</div>
+              <div class="ihud-bar"><div class="ihud-fill" id="ihud-fill"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Main stats -->
+        <div class="sheet-stats-row">
+          <div class="sheet-stat">
+            <div class="ss-val" id="s-time">00:00</div>
+            <div class="ss-lbl">Time</div>
+          </div>
+          <div class="sheet-stat primary">
+            <div class="ss-val" id="s-dist">0.00</div>
+            <div class="ss-lbl">km</div>
+          </div>
+          <div class="sheet-stat">
+            <div class="ss-val" id="s-pace">--:--</div>
+            <div class="ss-lbl">Pace</div>
+          </div>
+          <div class="sheet-stat">
+            <div class="ss-val" id="s-cal">0</div>
+            <div class="ss-lbl">kcal</div>
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="sheet-controls" id="sheet-controls">
+          <button class="ctrl-side" id="btn-interval-setup" title="Intervals">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="4" height="18" rx="1"/><rect x="10" y="8" width="4" height="13" rx="1"/><rect x="17" y="5" width="4" height="16" rx="1"/>
+            </svg>
+          </button>
+
+          <button class="ctrl-primary" id="btn-track-main">
+            <svg id="icon-play" width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            <svg id="icon-pause" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" class="hidden"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+          </button>
+
+          <button class="ctrl-side danger hidden" id="btn-track-stop" title="End run">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+          </button>
+          <button class="ctrl-side hidden" id="btn-track-resume" title="Resume" style="display:none">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Safety / hydration floating alerts -->
+      <div id="safety-alert" class="float-alert danger hidden">
+        <span>⚠️ Are you still going?</span>
+        <button id="btn-safety-ok" class="float-alert-btn">I'm OK</button>
+      </div>
+      <div id="hydration-alert" class="float-alert info hidden">
+        <span>💧 Time to hydrate!</span>
+        <button id="btn-hydration-ok" class="float-alert-btn">Got it</button>
+      </div>
+    </section>
+
+    <!-- ─── SOCIAL VIEW ──────────────────── -->
+    <section id="v-social" class="view hidden">
+      <header class="view-header">
+        <h1 class="view-title">Community</h1>
+      </header>
+      <div class="tab-bar" id="social-tabs">
+        <button class="tab active" data-tab="feed">Feed</button>
+        <button class="tab" data-tab="friends">Friends</button>
+        <button class="tab" data-tab="leaderboard">Board</button>
+        <button class="tab" data-tab="challenges">Challenges</button>
+      </div>
+
+      <!-- Feed tab -->
+      <div class="tab-panel active" id="tab-feed">
+        <div class="feed-list" id="feed-list">
+          <div class="empty-state"><div class="empty-icon">📰</div><div>No activities in feed yet</div></div>
+        </div>
+      </div>
+
+      <!-- Friends tab -->
+      <div class="tab-panel hidden" id="tab-friends">
+        <div class="friends-search-row">
+          <div class="search-input-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="friends-search" class="search-input" type="text" placeholder="Find runners…">
+          </div>
+        </div>
+
+        <div id="friend-requests" class="friend-section hidden">
+          <div class="friend-section-title">Requests</div>
+          <div id="friend-requests-list"></div>
+        </div>
+
+        <div class="friend-section">
+          <div class="friend-section-title">My Friends</div>
+          <div id="friends-list">
+            <div class="empty-state"><div class="empty-icon">👫</div><div>No friends yet. Search to add!</div></div>
+          </div>
+        </div>
+
+        <div class="friend-section" id="friends-suggestions">
+          <div class="friend-section-title">Suggested</div>
+          <div id="suggested-list"></div>
+        </div>
+      </div>
+
+      <!-- Leaderboard tab -->
+      <div class="tab-panel hidden" id="tab-leaderboard">
+        <div class="lb-filters">
+          <button class="pill-btn active" data-period="week">This Week</button>
+          <button class="pill-btn" data-period="month">Month</button>
+          <button class="pill-btn" data-period="all">All Time</button>
+        </div>
+        <div class="lb-sort-row">
+          <button class="sort-btn active" data-sort="distance">Distance</button>
+          <button class="sort-btn" data-sort="calories">Calories</button>
+          <button class="sort-btn" data-sort="steps">Steps</button>
+          <button class="sort-btn" data-sort="speed">Speed</button>
+        </div>
+        <div id="leaderboard-list" class="leaderboard-list"></div>
+      </div>
+
+      <!-- Challenges tab -->
+      <div class="tab-panel hidden" id="tab-challenges">
+        <button class="btn-primary create-challenge-btn" id="btn-create-challenge">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Create Challenge
+        </button>
+        <div id="challenges-list" class="challenges-list">
+          <div class="empty-state"><div class="empty-icon">🏆</div><div>No active challenges yet</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── PROFILE VIEW ──────────────────── -->
+    <section id="v-profile" class="view hidden">
+      <header class="profile-header">
+        <button class="icon-btn" id="btn-profile-settings">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+      </header>
+
+      <div class="profile-scroll">
+        <!-- Hero -->
+        <div class="profile-hero">
+          <div class="profile-avatar-big" id="profile-avatar-big">🏃</div>
+          <div class="profile-name" id="profile-name">Runner</div>
+          <div class="profile-joined" id="profile-joined">Runner since today</div>
+          <div class="pro-status-badge hidden" id="pro-status-badge">
+            <span>👑</span> DRS Pro Member
+          </div>
+        </div>
+
+        <!-- All-time stats -->
+        <div class="profile-stats-row">
+          <div class="profile-stat">
+            <div class="ps-val" id="ps-dist">0.0</div>
+            <div class="ps-lbl">km Total</div>
+          </div>
+          <div class="profile-stat">
+            <div class="ps-val" id="ps-runs">0</div>
+            <div class="ps-lbl">Activities</div>
+          </div>
+          <div class="profile-stat">
+            <div class="ps-val" id="ps-time">0h</div>
+            <div class="ps-lbl">Time</div>
+          </div>
+          <div class="profile-stat">
+            <div class="ps-val" id="ps-cal">0</div>
+            <div class="ps-lbl">kcal</div>
+          </div>
+        </div>
+
+        <!-- Achievements -->
+        <div class="section-header" style="padding: 0 20px;">
+          <span class="section-title">Achievements</span>
+          <span class="earned-count" id="earned-count">0 / 20</span>
+        </div>
+        <div class="achievement-grid" id="achievement-grid">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Performance button -->
+        <div class="profile-actions">
+          <button class="profile-action-btn" id="btn-perf-dashboard">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Performance Dashboard
+          </button>
+          <button class="profile-action-btn" id="btn-history-full">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+            Activity History
+          </button>
+        </div>
+
+        <!-- Pro upgrade card (hidden when already Pro) -->
+        <div class="pro-upgrade-card" id="pro-upgrade-card">
+          <div class="pro-card-header">
+            <span class="pro-crown">👑</span>
+            <div>
+              <div class="pro-card-title">DRS Pro</div>
+              <div class="pro-card-sub">Unlock your full potential</div>
+            </div>
+          </div>
+          <div class="pro-features-list">
+            <div class="pro-feature">✓ Advanced metrics & HR zones</div>
+            <div class="pro-feature">✓ AI coaching insights</div>
+            <div class="pro-feature">✓ Unlimited challenges & friends</div>
+            <div class="pro-feature">✓ Shareable workout cards</div>
+            <div class="pro-feature">✓ Route history & export</div>
+          </div>
+          <button class="btn-pro-upgrade" id="btn-pro-upgrade">Upgrade — $4.99/mo</button>
+        </div>
+
+        <!-- Pro active card (shown when user is Pro) -->
+        <div class="pro-active-card hidden" id="pro-active-card">
+          <div class="pro-active-icon">👑</div>
+          <div class="pro-active-title">You're a Pro Member!</div>
+          <div class="pro-active-sub">All features are unlocked. Thank you for supporting DRS.</div>
+          <button class="pro-manage-btn" id="btn-manage-subscription">Manage Subscription</button>
+        </div>
+
+        <div style="height: 24px;"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ══════════════════════════════════════
+       BOTTOM NAVIGATION
+  ══════════════════════════════════════ -->
+  <nav id="bottom-nav">
+    <button class="nav-btn active" data-nav="home">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+      <span>Home</span>
+    </button>
+    <button class="nav-btn" data-nav="social">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span>Social</span>
+    </button>
+    <button class="nav-btn nav-track" data-nav="track" id="nav-track-btn">
+      <div class="nav-track-fab">
+        <svg id="nav-track-icon" width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      </div>
+      <span>Track</span>
+    </button>
+    <button class="nav-btn" data-nav="profile">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span>Profile</span>
+    </button>
+  </nav>
+
+  <!-- ══════════════════════════════════════
+       MODALS
+  ══════════════════════════════════════ -->
+
+  <!-- Settings modal -->
+  <div class="modal-backdrop hidden" id="modal-settings">
+    <div class="modal-sheet" role="dialog" aria-label="Settings">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h2>Settings</h2>
+        <button class="modal-close" data-close="modal-settings">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="settings-section">
+          <div class="settings-title">Profile</div>
+          <label class="setting-row">
+            <span>Display Name</span>
+            <input id="set-name" class="setting-input" type="text" placeholder="Your name">
+          </label>
+          <label class="setting-row">
+            <span>Weight (kg)</span>
+            <input id="set-weight" class="setting-input" type="number" min="30" max="200">
+          </label>
+          <label class="setting-row">
+            <span>Age</span>
+            <input id="set-age" class="setting-input" type="number" min="10" max="100">
+          </label>
+          <label class="setting-row">
+            <span>Resting HR (BPM)</span>
+            <input id="set-rhr" class="setting-input" type="number" min="40" max="100">
+          </label>
+        </div>
+        <div class="settings-section">
+          <div class="settings-title">Tracking</div>
+          <label class="setting-row">
+            <span>Voice Feedback</span>
+            <input id="set-audio" type="checkbox" class="toggle-check">
+          </label>
+          <label class="setting-row">
+            <span>Hydration Reminders</span>
+            <input id="set-hydration" type="checkbox" class="toggle-check">
+          </label>
+          <label class="setting-row">
+            <span>Safety Alerts</span>
+            <input id="set-safety" type="checkbox" class="toggle-check">
+          </label>
+        </div>
+        <button class="btn-primary" id="btn-save-settings" style="width:100%; margin-top:16px;">Save Changes</button>
+        <button class="btn-danger" id="btn-sign-out" style="width:100%; margin-top:8px;">Sign Out</button>
+        <button class="btn-danger" id="btn-clear-data" style="width:100%; margin-top:8px;">Clear All Data</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Goal modal -->
+  <div class="modal-backdrop hidden" id="modal-goal">
+    <div class="modal-sheet" role="dialog" aria-label="Set Goal">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h2>Set Goal</h2>
+        <button class="modal-close" data-close="modal-goal">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="goal-type-row">
+          <button class="goal-type-btn active" data-gtype="distance">Distance</button>
+          <button class="goal-type-btn" data-gtype="time">Time</button>
+          <button class="goal-type-btn" data-gtype="calories">Calories</button>
+        </div>
+        <div class="goal-presets" id="goal-presets">
+          <button class="goal-preset" data-val="5">5 km</button>
+          <button class="goal-preset" data-val="10">10 km</button>
+          <button class="goal-preset" data-val="21.1">Half Marathon</button>
+          <button class="goal-preset" data-val="42.2">Marathon</button>
+        </div>
+        <div class="goal-custom-row">
+          <input id="goal-val" class="setting-input" type="number" placeholder="Custom value">
+          <span id="goal-unit" class="goal-unit-lbl">km</span>
+        </div>
+        <button class="btn-primary" id="btn-set-goal-confirm" style="width:100%; margin-top:16px;">Set Goal</button>
+        <button class="text-btn" id="btn-clear-goal" style="width:100%; margin-top:8px; text-align:center;">Clear Goal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interval setup modal -->
+  <div class="modal-backdrop hidden" id="modal-interval">
+    <div class="modal-sheet" role="dialog" aria-label="Interval Training">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h2>Interval Training</h2>
+        <button class="modal-close" data-close="modal-interval">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="interval-presets">
+          <button class="interval-preset" data-work="30" data-rest="30" data-reps="8">30/30 × 8</button>
+          <button class="interval-preset" data-work="60" data-rest="30" data-reps="6">60/30 × 6</button>
+          <button class="interval-preset" data-work="90" data-rest="60" data-reps="5">90/60 × 5</button>
+          <button class="interval-preset" data-work="120" data-rest="60" data-reps="4">2min/1min × 4</button>
+        </div>
+        <div class="interval-custom">
+          <label class="setting-row"><span>Work (sec)</span><input id="iv-work" class="setting-input" type="number" placeholder="30" min="5" max="600"></label>
+          <label class="setting-row"><span>Rest (sec)</span><input id="iv-rest" class="setting-input" type="number" placeholder="30" min="5" max="600"></label>
+          <label class="setting-row"><span>Reps</span><input id="iv-reps" class="setting-input" type="number" placeholder="8" min="1" max="50"></label>
+        </div>
+        <button class="btn-primary" id="btn-start-interval" style="width:100%;margin-top:16px;">Start Intervals</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Session summary modal -->
+  <div class="modal-backdrop hidden" id="modal-session">
+    <div class="modal-sheet tall" role="dialog" aria-label="Session Summary">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h2>Session Complete 🎉</h2>
+        <button class="modal-close" data-close="modal-session">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body" id="session-summary-body">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Share card modal -->
+  <div class="modal-backdrop hidden" id="modal-share">
+    <div class="modal-sheet" role="dialog" aria-label="Share Workout">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h2>Share Workout</h2>
+        <button class="modal-close" data-close="modal-share">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="share-card" id="share-card">
+          <!-- Populated by JS -->
+        </div>
+        <div class="share-actions">
+          <button class="btn-primary" id="btn-share-copy" style="flex:1;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            Copy Link
+          </button>
+          <button class="btn-secondary" id="btn-share-post" style="flex:1;">Post to Feed</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Achievement detail modal -->
+  <div class="modal-backdrop hidden" id="modal-achievement">
+    <div class="modal-sheet" role="dialog" aria-label="Achievement">
+      <div class="modal-handle"></div>
+      <div class="modal-body" style="text-align:center; padding: 32px 24px;">
+        <div class="ach-modal-icon" id="ach-modal-icon">🏅</div>
+        <div class="ach-modal-name" id="ach-modal-name">Achievement</div>
+        <div class="ach-modal-desc" id="ach-modal-desc">Description</div>
+        <div class="ach-modal-date" id="ach-modal-date"></div>
+        <button class="modal-close btn-primary" data-close="modal-achievement" style="width:100%;margin-top:24px;">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Performance dashboard modal -->
+  <div class="modal-backdrop hidden" id="modal-performance">
+    <div class="modal-sheet tall" role="dialog" aria-label="Performance Dashboard">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h2>Performance</h2>
+        <button class="modal-close" data-close="modal-performance">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body" id="perf-dashboard-body">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- History modal -->
+  <div class="modal-backdrop hidden" id="modal-history">
+    <div class="modal-sheet tall" role="dialog" aria-label="Activity History">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h2>Activity History</h2>
+        <button class="modal-close" data-close="modal-history">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body" id="history-body">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Create challenge modal -->
+  <div class="modal-backdrop hidden" id="modal-create-challenge">
+    <div class="modal-sheet" role="dialog" aria-label="Create Challenge">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h2>New Challenge</h2>
+        <button class="modal-close" data-close="modal-create-challenge">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <label class="setting-row"><span>Challenge Name</span><input id="ch-name" class="setting-input" type="text" placeholder="e.g. Run 100km this month"></label>
+        <label class="setting-row">
+          <span>Type</span>
+          <select id="ch-type" class="setting-input ob-select">
+            <option value="distance">Distance (km)</option>
+            <option value="calories">Calories</option>
+            <option value="steps">Steps</option>
+          </select>
+        </label>
+        <label class="setting-row"><span>Target</span><input id="ch-target" class="setting-input" type="number" placeholder="100"></label>
+        <label class="setting-row"><span>Duration (days)</span><input id="ch-days" class="setting-input" type="number" placeholder="30"></label>
+        <button class="btn-primary" id="btn-create-challenge-confirm" style="width:100%;margin-top:16px;">Create Challenge</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- #app -->
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+</body>
+</html>
