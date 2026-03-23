@@ -788,7 +788,7 @@ const Tracker = {
     State.status = 'idle';
     State.goal = null;
     this.updateUI();
-    if (session.distanceKm > 0.01) {
+    if (session.distanceKm > 0.01 || session.durationMs >= 10000) {
       SupaStorage.addWorkout(session);
       Achievements.checkAll(session);
       SessionSummary.show(session);
@@ -1827,6 +1827,10 @@ const Profile = {
     set('ps-time', totalTime > 3600000 ? `${(totalTime/3600000).toFixed(0)}h` : `${Math.floor(totalTime/60000)}m`);
     set('ps-cal',  Math.round(totalCal));
 
+    // Sign-in banner for guests
+    const banner = document.getElementById('profile-signin-banner');
+    if (banner) banner.classList.toggle('hidden', !!Auth.user);
+
     // Achievements
     Achievements.renderGrid();
   },
@@ -2336,6 +2340,19 @@ const App = {
 
     // Sign out
     document.getElementById('btn-sign-out')?.addEventListener('click', () => Auth.signOut());
+
+    // Profile sign-in / sign-up banner buttons
+    document.getElementById('btn-profile-signin')?.addEventListener('click', () => {
+      Auth._isSignUp = false;
+      Auth._showModal('Sign in to your account');
+    });
+    document.getElementById('btn-profile-signup')?.addEventListener('click', () => {
+      Auth._isSignUp = true;
+      Auth._showModal('Create your account');
+      document.getElementById('auth-submit').textContent = 'Create Account';
+      document.getElementById('auth-toggle-label').textContent = 'Already have one? Sign in';
+      document.getElementById('auth-subtitle').textContent = 'Create your account';
+    });
 
     // Safety / hydration
     document.getElementById('btn-safety-ok').addEventListener('click', () => {
