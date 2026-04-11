@@ -761,6 +761,9 @@ const Tracker = {
     State.status = 'running';
     this.startGPS();
     this.startTimers();
+    this.startWakeLock();
+    this.startAutoSave();
+    this.startVisibilityGuard();
     this.updateUI();
     Audio.speak(`${State.mode} started. Good luck!`);
     Toast.success('Activity started!');
@@ -772,6 +775,9 @@ const Tracker = {
     State.pauseStart = Date.now();
     this.stopTimers();
     this.stopGPS();
+    this.releaseWakeLock();
+    this.stopAutoSave();
+    this.stopVisibilityGuard();
     this.updateUI();
     Audio.speak('Paused');
   },
@@ -784,6 +790,10 @@ const Tracker = {
     if (State.status === 'idle') return;
     this.stopTimers();
     this.stopGPS();
+    this.releaseWakeLock();
+    this.stopAutoSave();
+    this.stopVisibilityGuard();
+    localStorage.removeItem('rt_autosave');
     const session = this.buildSession();
     State.status = 'idle';
     State.goal = null;
@@ -837,6 +847,82 @@ const Tracker = {
       State.gpsWatchId = null;
     }
     this.setGPSStatus('idle');
+  },
+
+  /* ── Wake Lock: keeps screen ON during run ── */
+  _wakeLock: null,
+  async startWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    try {
+      this._wakeLock = await navigator.wakeLock.request('screen');
+    } catch (e) { /* silently ignore if denied */ }
+  },
+  async releaseWakeLock() {
+    if (this._wakeLock) { await this._wakeLock.release(); this._wakeLock = null; }
+  },
+
+  /* ── Auto-save: saves run data every 10s to localStorage ── */
+  _autoSaveTimer: null,
+  startAutoSave() {
+    this._autoSaveTimer = setInterval(() => {
+      if (State.status !== 'running') return;
+      const snapshot = {
+        startTime:   State.startTime,
+        pausedMs:    State.pausedMs,
+        distanceKm:  State.distanceKm,
+        calories:    State.calories,
+        steps:       State.steps,
+        mode:        State.mode,
+        coords:      State.coords.slice(-200),
+        savedAt:     Date.now(),
+      };
+      localStorage.setItem('rt_autosave', JSON.stringify(snapshot));
+    }, 10000);
+  },
+  stopAutoSave() {
+    if (this._autoSaveTimer) { clearInterval(this._autoSaveTimer); this._autoSaveTimer = null; }
+  },
+
+  /* ── Visibility Guard: warns user when they switch away mid-run ── */
+  _visHandler: null,
+  startVisibilityGuard() {
+    this._visHandler = () => {
+      if (document.hidden && State.status === 'running') {
+        Toast.warning('⚠️ Keep the app open to continue tracking your run!');
+      }
+    };
+    document.addEventListener('visibilitychange', this._visHandler);
+  },
+  stopVisibilityGuard() {
+    if (this._visHandler) {
+      document.removeEventListener('visibilitychange', this._visHandler);
+      this._visHandler = null;
+    }
+  },
+
+  /* ── Resume from auto-save if run was interrupted ── */
+  checkAutoSaveRestore() {
+    const raw = localStorage.getItem('rt_autosave');
+    if (!raw) return;
+    try {
+      const snap = JSON.parse(raw);
+      const age  = Date.now() - snap.savedAt;
+      if (age > 30 * 60 * 1000) { localStorage.removeItem('rt_autosave'); return; } // ignore if >30 min old
+      if (confirm(`You have an unfinished ${snap.mode} (${snap.distanceKm.toFixed(2)} km). Resume it?`)) {
+        State.startTime  = snap.startTime;
+        State.pausedMs   = snap.pausedMs + age;
+        State.distanceKm = snap.distanceKm;
+        State.calories   = snap.calories;
+        State.steps      = snap.steps;
+        State.mode       = snap.mode;
+        State.coords     = snap.coords || [];
+        State.status     = 'paused';
+        Nav.go('track');
+        Toast.success('Run restored! Press Resume to continue.');
+      } else {
+        localStorage.removeItem('rt_autosave');
+      }
+    } catch (e) { localStorage.removeItem('rt_autosave'); }
   },
 
   handleGPS(pos) {
@@ -2241,6 +2327,7 @@ const App = {
     Goal.init();
     Home.refresh();
     StripeEngine.init();
+    Tracker.checkAutoSaveRestore();
 
     // Bind track controls
     document.getElementById('btn-track-main').addEventListener('click', () => {
