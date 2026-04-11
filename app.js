@@ -1226,6 +1226,20 @@ const Achievements = {
   renderGrid() {
     const grid = document.getElementById('achievement-grid');
     if (!grid) return;
+
+    if (!StripeEngine.isPro()) {
+      grid.innerHTML = `
+        <div style="grid-column:1/-1;display:flex;flex-direction:column;align-items:center;padding:28px 16px;text-align:center;gap:12px;">
+          <div style="font-size:36px;">👑</div>
+          <div style="font-weight:700;color:var(--text);">Pro Feature</div>
+          <div style="font-size:13px;color:var(--text-2);line-height:1.5;">Unlock Achievements &amp; Badges with DRS Pro.</div>
+          <button class="btn-pro-upgrade" onclick="StripeEngine.goToCheckout()">Upgrade to Pro — $4.99/mo</button>
+        </div>`;
+      const countEl = document.getElementById('earned-count');
+      if (countEl) countEl.textContent = '🔒 Pro';
+      return;
+    }
+
     const badges = Storage.getBadges();
     grid.innerHTML = '';
     let earnedCount = 0;
@@ -1262,6 +1276,7 @@ const Social = {
   lbSort: 'distance',
 
   refresh() {
+    if (!StripeEngine.isPro()) { this.renderProGate(); return; }
     this.renderFeed();
     this.renderLeaderboard();
     this.renderFriends();
@@ -1269,7 +1284,24 @@ const Social = {
   },
 
   async refreshAsync() {
+    if (!StripeEngine.isPro()) { this.renderProGate(); return; }
     await Promise.all([this.renderFeed(), this.renderLeaderboard(), this.renderFriends(), this.renderChallenges()]);
+  },
+
+  renderProGate() {
+    const container = document.getElementById('v-social');
+    if (!container) return;
+    container.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:70vh;padding:32px;text-align:center;gap:16px;">
+        <div style="font-size:48px;">👑</div>
+        <div style="font-size:22px;font-weight:700;color:var(--text);">Pro Feature</div>
+        <div style="font-size:15px;color:var(--text-2);line-height:1.6;">
+          Social Feed, Leaderboard, Friends &amp; Challenges are available on <strong>DRS Pro</strong>.
+        </div>
+        <button class="btn-pro-upgrade" onclick="StripeEngine.goToCheckout()" style="margin-top:8px;">
+          Upgrade to Pro — $4.99/mo
+        </button>
+      </div>`;
   },
 
   switchTab(tab) {
